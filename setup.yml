@@ -1,0 +1,65 @@
+---
+- name: Set up the demo
+  hosts: tag_Application_pgsql
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Install packages
+      ansible.builtin.dnf:
+        name:
+          - postgresql-server
+          - python3-pip
+        state: present
+
+    - name: Initialize postgres
+      ansible.builtin.command: postgresql-setup --initdb
+      args:
+        creates: /var/lib/pgsql/data/postgresql.conf
+      become_user: postgres
+
+    - name: Listen on all addresses
+      ansible.builtin.lineinfile:
+        path: /var/lib/pgsql/data/postgresql.conf
+        insertafter: '^#listen_addresses'
+        line: listen_addresses = '*'
+
+    - name: Start/enable postgres
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+        enabled: true
+
+    # DB operations will run on the remote side
+    - name: Install python dependency
+      ansible.builtin.pip:
+        name: psycopg2-binary
+        state: present
+
+    - name: Make a random number of databases
+      community.postgresql.postgresql_db:
+        name: database_{{ item }}
+      loop: "{{ range(1, 1 + 10 | random(start=1, seed=inventory_hostname)) }}"
+      become_user: postgres
+
+    - name: Make a table in each database
+      community.postgresql.postgresql_table:
+        table: users
+        db: database_{{ item }}
+        columns:
+          - id serial primary key
+          - name text not null
+          - created_on timestamptz
+      loop: "{{ range(1, 1 + 10 | random(start=1, seed=inventory_hostname)) }}"
+      become_user: postgres
+      notify: Create data
+
+  handlers:
+    - name: Create data
+      vars:
+        _rand: "{{ 1 + 1000 | random(start=1, seed=inventory_hostname) }}"
+      community.postgresql.postgresql_query:
+        db: database_{{ item }}
+        query: INSERT INTO users (name) SELECT 'Zach' FROM generate_series(1, {{ _rand }});
+      loop: "{{ range(1, 1 + 10 | random(start=1, seed=inventory_hostname)) }}"
+      become_user: postgres

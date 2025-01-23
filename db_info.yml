@@ -1,0 +1,56 @@
+---
+- name: Get DB info
+  hosts: tag_Application_pgsql
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Get postgres info
+      community.postgresql.postgresql_info:
+        filter:
+          - version
+          - databases
+        db: postgres
+      become_user: postgres
+      register: _db_info
+
+    - name: Save database info
+      ansible.builtin.set_fact:
+        _db_version: "{{ _db_info.version.full }}"
+        _db_list: "{{ _db_info.databases | dict2items(key_name='name', value_name='details') }}"
+
+    - name: Calculate sum of database sizes
+      ansible.builtin.set_fact:
+        _db_sum: "{{ _db_sum | default(0) | int + item.details.size | int }}"
+      loop: "{{ _db_list }}"
+
+- name: Determine next server
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Prepare host data
+      vars:
+        _value:
+          name: "{{ hostvars[item]['inventory_hostname'] }}"
+          sum: "{{ hostvars[item]['_db_sum'] }}"
+      ansible.builtin.set_fact:
+        _host_data: "{{ _host_data | default([]) + [_value] }}"
+      loop: "{{ groups['tag_Application_pgsql'] }}"
+
+    - name: Set next server artifact
+      ansible.builtin.set_stats:
+        data:
+          next_server: "{{ _host_data | min(attribute='sum') | ansible.utils.get_path('name') }}"
+
+- name: Show DB info
+  hosts: tag_Application_pgsql
+  gather_facts: false
+
+  tasks:
+    - name: Display system-wide postgres info
+      ansible.builtin.debug:
+        msg:
+          - PostgreSQL version is {{ _db_version }}
+          - Contains {{  _db_list | length }} databases
+          - Sum of database sizes is {{ _db_sum | int | human_readable }}

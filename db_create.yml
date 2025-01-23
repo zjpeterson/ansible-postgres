@@ -1,0 +1,55 @@
+---
+- name: Create a new database and establish admin user
+  hosts: "{{ next_server | default('all') }}"
+  gather_facts: false
+  become: true
+  become_user: postgres
+
+  tasks:
+    - name: Make the database
+      community.postgresql.postgresql_db:
+        name: "{{ database_name }}"
+
+    - name: Determine admin password
+      ansible.builtin.set_fact:
+        _admin_password: "{{ lookup('ansible.builtin.password', '/dev/null', seed=inventory_hostname) }}"
+      no_log: true
+
+    - name: Make the admin user
+      community.postgresql.postgresql_user:
+        db: "{{ database_name }}"
+        name: dbadmin
+        password: "{{ _admin_password }}"
+
+    - name: Give permission to the admin user
+      community.postgresql.postgresql_privs:
+        db: "{{ database_name }}"
+        privs: ALL
+        roles: dbadmin
+        type: database
+        grant_option: true
+
+    - name: Allow remote connections
+      community.postgresql.postgresql_pg_hba:
+        dest: /var/lib/pgsql/data/pg_hba.conf
+        source: 0.0.0.0/0
+        contype: host
+        users: dbadmin
+        databases: "{{ database_name }}"
+      notify: Restart postgresql
+
+    - name: Restart if needed
+      ansible.builtin.meta: flush_handlers
+
+    - name: Display connection info
+      ansible.builtin.debug:
+        msg:
+          - Database {{ database_name }} available on {{ inventory_hostname }}:5432
+          - Username - dbadmin
+          - Password - {{ _admin_password }} # don't actually dump passwords to debug; demonstration only
+
+  handlers:
+    - name: Restart postgresql
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
