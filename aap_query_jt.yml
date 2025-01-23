@@ -21,6 +21,7 @@
       ansible.controller.job_template:
         controller_host: "{{ controller_host | default(omit) }}"
         controller_oauthtoken: "{{ controller_token | default(omit) }}"
+        validate_certs: false
         name: SQL Query - {{ inventory_hostname }}
         project: Postgres demo
         playbook: db_query.yml
