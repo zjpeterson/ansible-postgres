@@ -1,0 +1,43 @@
+---
+- name: Make Job Templates for DB queries
+  hosts: tag_Application_pgsql
+  gather_facts: false
+
+  tasks:
+    - name: Get postgres info
+      community.postgresql.postgresql_info:
+        filter:
+          - databases
+        db: postgres
+      become: true
+      become_user: postgres
+      register: _db_info
+
+    - name: Save database info
+      ansible.builtin.set_fact:
+        _db_list: "{{ _db_info.databases | dict2items(key_name='name', value_name='details') }}"
+
+    - name: Create Job Templates
+      ansible.controller.job_template:
+        name: SQL Query - {{ inventory_hostname }}
+        project: Postgres demo
+        playbook: db_query.yml
+        inventory: AWS Postgres
+        limit: "{{ inventory_hostname }}"
+        credentials:
+          - Database
+          - EC2
+        survey_enabled: true
+        survey_spec:
+          name: ""
+          description: ""
+          spec:
+            - question_name: Database
+              required: true
+              type: multiplechoice
+              variable: db_name
+              choices: "{{ _db_list | map(attribute='name') | list }}"
+            - question_name: Query
+              required: true
+              type: textarea
+              variable: db_query

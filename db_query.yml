@@ -1,0 +1,50 @@
+---
+- name: Ensure user has SELECT privs
+  hosts: all # expecting a limit, not applying any further restriction
+  gather_facts: false
+  become: true
+  become_user: postgres
+
+  tasks:
+    - name: Ensure query user
+      community.postgresql.postgresql_user:
+        db: "{{ db_name }}"
+        name: "{{ cred_username }}"
+        password: "{{ cred_password }}"
+
+    - name: Ensure user permission
+      community.postgresql.postgresql_privs:
+        db: "{{ db_name }}"
+        privs: SELECT
+        roles: "{{ cred_username }}"
+        type: database
+
+    - name: Allow remote connections
+      community.postgresql.postgresql_pg_hba:
+        dest: /var/lib/pgsql/data/pg_hba.conf
+        source: 0.0.0.0/0
+        contype: host
+        users: "{{ cred_username }}"
+        databases: "{{ database_name }}"
+      notify: Restart postgresql
+
+  handlers:
+    - name: Restart postgresql
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+      become_user: root
+
+- name: Make query and save results
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Execute query
+      community.postgresql.postgresql_query:
+        db: "{{ db_name }}"
+        login_user: "{{ cred_username }}"
+        login_password: "{{ cred_username }}"
+        login_host: "{{ ansible_limit }}"
+        query: "{{ db_query }}"
