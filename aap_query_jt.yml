@@ -30,6 +30,7 @@
         credentials:
           - Database
           - EC2
+          - AWS
         survey_enabled: true
         survey_spec:
           name: ""
