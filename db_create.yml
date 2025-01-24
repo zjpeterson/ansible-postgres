@@ -44,7 +44,7 @@
     - name: Display connection info
       ansible.builtin.debug:
         msg:
-          - Database {{ database_name }} available on {{ inventory_hostname }}:5432
+          - Database {{ database_name }} available on {{ public_dns_name }}:5432
           - Username - dbadmin
           - Password - {{ _admin_password }} # don't actually dump passwords to debug; demonstration only
 
