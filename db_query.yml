@@ -47,7 +47,7 @@
         db: "{{ db_name }}"
         login_user: "{{ cred_username }}"
         login_password: "{{ cred_password }}"
-        login_host: "{{ ansible_limit }}"
+        login_host: "{{ hostvars[ansible_limit]['ansible_host'] }}"
         query: "{{ db_query }}"
       delegate_to: localhost
       register: _query
