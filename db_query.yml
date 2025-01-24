@@ -17,7 +17,9 @@
         db: "{{ db_name }}"
         privs: SELECT
         roles: "{{ cred_username }}"
-        type: database
+        type: table
+        schema: public
+        objs: ALL_IN_SCHEMA
 
     - name: Allow remote connections
       community.postgresql.postgresql_pg_hba:
@@ -25,7 +27,7 @@
         source: 0.0.0.0/0
         contype: host
         users: "{{ cred_username }}"
-        databases: "{{ database_name }}"
+        databases: "{{ db_name }}"
       notify: Restart postgresql
 
   handlers:
@@ -36,7 +38,7 @@
       become_user: root
 
 - name: Make query and save results
-  hosts: localhost
+  hosts: all
   connection: local
   gather_facts: false
 
@@ -45,6 +47,7 @@
       community.postgresql.postgresql_query:
         db: "{{ db_name }}"
         login_user: "{{ cred_username }}"
-        login_password: "{{ cred_username }}"
+        login_password: "{{ cred_password }}"
         login_host: "{{ ansible_limit }}"
         query: "{{ db_query }}"
+      delegate_to: localhost
