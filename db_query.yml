@@ -40,7 +40,6 @@
 - name: Make query and save results
   hosts: all
   connection: local
-  gather_facts: false
 
   tasks:
     - name: Execute query
@@ -51,3 +50,13 @@
         login_host: "{{ ansible_limit }}"
         query: "{{ db_query }}"
       delegate_to: localhost
+      register: _query
+
+    - name: Copy results to file
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/query_{{ inventory_hostname }}_{{ ansible_date_time.iso8601 }}.csv"
+        content: |
+          {{ _query.query_result.0.keys() | join(',') }}
+          {% for row in _query.query_result %}
+          {{ row.values() | join(',') }}
+          {% endfor %}
