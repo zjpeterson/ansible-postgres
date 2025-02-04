@@ -1,0 +1,46 @@
+---
+- name: Create a new database and establish user
+  hosts: database
+  gather_facts: false
+  become: true
+  become_user: postgres
+
+  vars:
+    database_user: automationeda
+    database_name: automationeda
+    database_password:
+
+  tasks:
+    - name: Make the database
+      community.postgresql.postgresql_db:
+        name: "{{ database_name }}"
+
+    - name: Make the admin user
+      community.postgresql.postgresql_user:
+        db: "{{ database_name }}"
+        name: "{{ database_user }}"
+        password: "{{ database_password }}"
+
+    - name: Give permission to the admin user
+      community.postgresql.postgresql_privs:
+        db: "{{ database_name }}"
+        privs: ALL
+        roles: "{{ database_user }}"
+        type: database
+        grant_option: true
+
+    - name: Allow remote connections
+      community.postgresql.postgresql_pg_hba:
+        dest: /var/lib/pgsql/data/pg_hba.conf
+        source: 0.0.0.0/0
+        contype: host
+        users: "{{ database_user }}"
+        databases: "{{ database_name }}"
+      notify: Restart postgresql
+
+  handlers:
+    - name: Restart postgresql
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+      become_user: root
